@@ -1,0 +1,35 @@
+name: Keepalive (automatic ping - not a real request)
+
+# نبض تلقائي كل 3 أيام لمنع إيقاف مشروع Supabase المجاني بسبب عدم النشاط.
+# هذا النبض آلي بالكامل وليس طلبًا أو نشاطًا حقيقيًا من أي مستخدم.
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (keepalive_ping)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing SUPABASE_URL or SUPABASE_ANON_KEY secrets"; exit 1
+          fi
+          # المفاتيح القديمة (anon) تبدأ بـ eyJ وتحتاج Authorization، أما المفاتيح الحديثة (sb_publishable_) فتكفيها apikey.
+          if [[ "$SUPABASE_ANON_KEY" == eyJ* ]]; then
+            AUTH_HEADER="Authorization: Bearer $SUPABASE_ANON_KEY"
+          else
+            AUTH_HEADER="X-Keepalive: github-actions"
+          fi
+          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive_ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -d '{"p_note":"Automatic keepalive ping (GitHub Actions) - not a real user request | تنبيه تلقائي لإبقاء المشروع نشطًا - ليس نشاطًا حقيقيًا"}'
+          echo "Keepalive ping sent."
